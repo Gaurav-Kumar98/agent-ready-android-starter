@@ -1,0 +1,32 @@
+# Supabase local development config. `npx supabase start` uses this.
+# Full reference: https://supabase.com/docs/guides/local-development/cli/config
+
+project_id = "expo-android-template"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public"]
+max_rows = 1000
+
+[db]
+port = 54322
+major_version = 17
+
+[studio]
+enabled = true
+port = 54323
+
+[auth]
+enabled = true
+site_url = "http://127.0.0.1:3000"
+# Local dev: no SMTP, so confirmations are off. Cloud projects default to ON —
+# the sign-up screen already handles both paths.
+[auth.email]
+enable_signup = true
+enable_confirmations = false
+
+# RevenueCat calls this webhook with a shared secret, not a Supabase JWT.
+[functions.revenuecat-webhook]
+verify_jwt = false

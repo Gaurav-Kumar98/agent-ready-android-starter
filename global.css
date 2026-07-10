@@ -1,0 +1,44 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * Semantic color tokens. Components never reference raw hex values —
+ * they use the token classes from tailwind.config.js (bg-surface,
+ * text-foreground, ...) and these variables decide light vs dark.
+ */
+@layer base {
+  :root {
+    --color-background: #f7f7f8;
+    --color-surface: #ffffff;
+    --color-surface-raised: #ffffff;
+    --color-border: #e4e4e7;
+    --color-primary: #4f46e5;
+    --color-primary-pressed: #4338ca;
+    --color-on-primary: #ffffff;
+    --color-foreground: #18181b;
+    --color-foreground-secondary: #52525b;
+    --color-foreground-muted: #a1a1aa;
+    --color-danger: #dc2626;
+    --color-on-danger: #ffffff;
+    --color-success: #16a34a;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --color-background: #09090b;
+      --color-surface: #18181b;
+      --color-surface-raised: #27272a;
+      --color-border: #3f3f46;
+      --color-primary: #818cf8;
+      --color-primary-pressed: #6366f1;
+      --color-on-primary: #1e1b4b;
+      --color-foreground: #fafafa;
+      --color-foreground-secondary: #d4d4d8;
+      --color-foreground-muted: #71717a;
+      --color-danger: #f87171;
+      --color-on-danger: #450a0a;
+      --color-success: #4ade80;
+    }
+  }
+}

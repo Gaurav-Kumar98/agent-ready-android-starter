@@ -1,0 +1,24 @@
+# Happy path: sign up with a fresh email and land on Home.
+# Requires the local Supabase stack (email confirmations off) and the app
+# pointed at it via .env.
+appId: com.example.expoandroidtemplate
+---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible: 'Welcome back'
+    timeout: 30000
+- tapOn: 'No account yet? Sign up'
+- tapOn:
+    id: 'email-input'
+- inputText: 'e2e-${maestro.timestamp}@example.com'
+- tapOn:
+    id: 'password-input'
+- inputText: 'test-password-123'
+- tapOn:
+    id: 'sign-up-button'
+- extendedWaitUntil:
+    visible:
+      id: 'home-screen'
+    timeout: 30000
+- assertVisible: 'Welcome back, .*'

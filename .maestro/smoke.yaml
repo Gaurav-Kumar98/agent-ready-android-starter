@@ -1,0 +1,13 @@
+# Smoke test: the app launches and renders the entry screen.
+# Run with the dev client on an emulator: npm run e2e
+appId: com.example.expoandroidtemplate
+---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible: 'Welcome back'
+    timeout: 30000
+- assertVisible:
+    id: 'email-input'
+- assertVisible:
+    id: 'sign-in-button'

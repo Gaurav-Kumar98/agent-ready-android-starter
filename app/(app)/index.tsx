@@ -1,0 +1,66 @@
+import { useRouter } from 'expo-router';
+import { View } from 'react-native';
+
+import { Button, Card, EmptyState, ErrorState, Screen, Skeleton, Text } from '@/components/ui';
+import { useAuth } from '@/features/auth/auth-provider';
+import { useProfile } from '@/features/profile/use-profile';
+import { useEntitlement } from '@/features/purchases/use-entitlement';
+
+export default function HomeScreen() {
+  const router = useRouter();
+  const { session } = useAuth();
+  const { data: profile, isLoading, error, refetch } = useProfile(session?.user.id);
+  const { data: isPremium } = useEntitlement();
+
+  if (isLoading) {
+    return (
+      <Screen testID="home-screen" className="gap-3 pt-4">
+        <Skeleton className="h-8 w-12" />
+        <Skeleton className="h-6 w-8" />
+        <Skeleton className="h-12" />
+      </Screen>
+    );
+  }
+
+  if (error) {
+    return (
+      <Screen testID="home-screen">
+        <ErrorState message={error} onRetry={refetch} />
+      </Screen>
+    );
+  }
+
+  if (!profile) {
+    return (
+      <Screen testID="home-screen">
+        <EmptyState
+          title="No profile yet"
+          message="Your profile hasn't been created. Pull to refresh or contact support if this persists."
+          action={{ label: 'Retry', onPress: refetch }}
+        />
+      </Screen>
+    );
+  }
+
+  return (
+    <Screen testID="home-screen" className="gap-4 pt-4">
+      <View className="gap-1">
+        <Text variant="display">Home</Text>
+        <Text className="text-foreground-secondary">
+          Welcome back, {profile.display_name ?? session?.user.email}
+        </Text>
+      </View>
+      <Card className="gap-2">
+        <Text variant="title">{isPremium ? 'Premium' : 'Free plan'}</Text>
+        <Text className="text-foreground-secondary">
+          {isPremium
+            ? 'You have full access. Thanks for supporting the app!'
+            : 'Upgrade to unlock everything this app has to offer.'}
+        </Text>
+        {!isPremium ? (
+          <Button label="Upgrade" onPress={() => router.push('/paywall')} className="mt-2" />
+        ) : null}
+      </Card>
+    </Screen>
+  );
+}
