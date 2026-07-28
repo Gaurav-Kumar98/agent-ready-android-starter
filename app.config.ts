@@ -38,6 +38,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     'expo-secure-store',
     'expo-font',
     'expo-updates',
+    // Pins every native module to one NDK — see the file for why.
+    './plugins/with-android-native-build',
     [
       'expo-splash-screen',
       {
