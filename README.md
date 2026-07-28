@@ -26,6 +26,8 @@ in rather than crashing on launch.
 | Framework | Expo SDK 57 (managed workflow, dev client — not Expo Go) |
 | Routing | Expo Router (file-based, typed routes) |
 | Styling | NativeWind — semantic tokens only, dark mode from day one |
+| Primitives | gluestack UI v5 (headless) wrapped in the local design system |
+| Animation | Reanimated 4 + react-native-worklets |
 | Server state | TanStack React Query (caching, retry, dedup, refetch) |
 | OTA updates | `expo-updates` with a fingerprint runtime version |
 | Backend | Supabase: Postgres + Auth + Storage + Edge Functions |
@@ -97,4 +99,9 @@ See [AGENTS.md](AGENTS.md) for the full set of rules and
 
 Maestro CLI for E2E runs: `curl -Ls https://get.maestro.mobile.dev | bash`
 (on Windows, install via WSL or see maestro.dev). After pushing to GitHub,
-mark the repo as a **Template repository** in Settings and enable CodeRabbit.
+mark the repo as a **Template repository** in Settings.
+
+Code review is human-triggered, not a bot on the PR: open the PR, then run
+`/review <PR number>` from Claude Code, or `/code-review ultra <PR number>` for
+the deeper multi-agent pass. CI never reviews the diff — it only proves the app
+still compiles and passes tests.

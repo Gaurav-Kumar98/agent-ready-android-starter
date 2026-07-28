@@ -24,6 +24,8 @@ consequences:
 
 - Expo SDK (managed workflow) + TypeScript (strict) + Expo Router (file-based routing)
 - NativeWind for styling — Tailwind classes only, no `StyleSheet.create`, no inline style objects except for dynamic values that cannot be expressed as classes
+- gluestack UI v5 (`@gluestack-ui/core`) for headless behaviour + accessibility on complex primitives
+- Reanimated 4 (with `react-native-worklets`) for animation
 - TanStack React Query for all server state (caching, retries, dedup, refetch)
 - Supabase: Postgres + Auth + Storage + Edge Functions
 - RevenueCat for all monetization (wraps Google Play Billing)
@@ -104,6 +106,39 @@ Rules:
 - Inputs are labelled for screen readers: the visible label is wired to the
   field, not just rendered above it.
 
+### gluestack UI v5 — behaviour, not looks
+
+gluestack v5 is headless. A `create*` factory owns the behaviour and the
+accessibility semantics and hands them to a `Root` you style yourself. The
+split is: **gluestack decides how it behaves, `tailwind.config.js` decides how
+it looks, Reanimated decides how it moves.**
+
+- Reach for gluestack when a primitive has real interaction semantics worth not
+  reinventing — Actionsheet, Modal, AlertDialog, Select, Popover, Toast,
+  Checkbox, Radio, Slider, Tabs. Focus traps, escape handling and ARIA state
+  are exactly the things hand-rolled components get wrong.
+- Do **not** reach for it for a styled box. `Button`, `Card`, `Text`, `Input`,
+  `Screen` stay hand-rolled — a second Button is how a design system dies.
+- **Never import `@gluestack-ui/*` inside `app/`.** Wrap it in
+  `src/components/ui/` so screens keep importing from one place and the token
+  rules above still apply. `src/components/ui/switch.tsx` is the reference.
+- gluestack ships untranspiled ESM, so any new gluestack subpath may need
+  adding to `esmPackages` in `jest.config.js`.
+
+### Reanimated
+
+- `babel-preset-expo` wires `react-native-worklets/plugin` automatically when
+  the package is installed. Do not add it to `babel.config.js` by hand.
+- Reanimated components ignore `className` — NativeWind only auto-registers a
+  few libraries, and an unregistered component drops the prop silently, so
+  styles just never apply. Import `AnimatedView` from
+  `src/components/ui/animated.tsx` instead of `Animated.View`.
+- Any looping or decorative animation checks `useReducedMotion()` first. A
+  pulsing screen is a vestibular trigger, not a nice touch.
+- Animate transforms and opacity. Animating layout or colour means resolving
+  token values in JS, which defeats the theming system — switch classes
+  conditionally instead (see `switch.tsx`).
+
 ## Supabase rules
 
 - Row Level Security is enabled on EVERY table. A migration that creates a
@@ -173,7 +208,15 @@ Rules:
 - Report honestly. If you could not run something — no emulator, no Maestro
   installed — say so instead of implying it passed.
 - Commits: Conventional Commits (`feat:`, `fix:`, `chore:`...). Keep PRs under
-  ~400 changed lines so CodeRabbit reviews stay useful.
+  ~400 changed lines so a review pass stays useful.
+- Review is human-triggered and separate from CI. The developer runs
+  `/review <PR number>` from Claude Code on the open PR, or
+  `/code-review ultra <PR number>` for the deeper multi-agent pass. **You
+  cannot review your own PR and must never report that a review happened.**
+  Open the PR, say it is ready for review, and stop there.
+- CI repairs a lockfile that `npm ci` rejects and pushes the fix back to the PR
+  branch (see `.github/workflows/ci.yml`). If CI has committed to your branch,
+  pull before committing again.
 - Never run `eas build`, `eas submit`, or `eas update` unless explicitly asked.
 - If a task is ambiguous, list your assumptions at the top of your response
   before writing code — do not silently pick an interpretation.
