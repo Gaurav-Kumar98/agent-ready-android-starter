@@ -15,9 +15,9 @@ export default function HomeScreen() {
   if (isLoading) {
     return (
       <Screen testID="home-screen" className="gap-3 pt-4">
-        <Skeleton className="h-8 w-12" />
-        <Skeleton className="h-6 w-8" />
-        <Skeleton className="h-12" />
+        <Skeleton className="h-8 w-1/2" />
+        <Skeleton className="h-6 w-3/4" />
+        <Skeleton className="h-12 w-full" />
       </Screen>
     );
   }

@@ -9,6 +9,8 @@
 //
 // Event reference: https://www.revenuecat.com/docs/integrations/webhooks
 
+import { timingSafeEqual } from 'node:crypto';
+
 import { createClient } from 'npm:@supabase/supabase-js@2';
 
 type RevenueCatEvent = {
@@ -17,7 +19,27 @@ type RevenueCatEvent = {
   entitlement_ids: string[] | null;
   product_id: string | null;
   expiration_at_ms: number | null;
+  /** TRANSFER only: the ids the entitlement moved away from / to. */
+  transferred_from: string[] | null;
+  transferred_to: string[] | null;
 };
+
+/** Constant-time compare so the secret cannot be recovered byte-by-byte. */
+function secretMatches(provided: string | null, expected: string): boolean {
+  if (provided === null) {
+    return false;
+  }
+  const a = new TextEncoder().encode(provided);
+  const b = new TextEncoder().encode(expected);
+  // timingSafeEqual throws on length mismatch, which would itself leak length.
+  if (a.byteLength !== b.byteLength) {
+    return false;
+  }
+  return timingSafeEqual(a, b);
+}
+
+/** Must stay in sync with ENTITLEMENTS in src/features/purchases/products.ts. */
+const DEFAULT_ENTITLEMENT = 'premium';
 
 const STATUS_BY_EVENT: Record<string, 'active' | 'expired' | 'billing_issue' | 'cancelled'> = {
   INITIAL_PURCHASE: 'active',
@@ -33,8 +55,7 @@ const STATUS_BY_EVENT: Record<string, 'active' | 'expired' | 'billing_issue' | '
 
 Deno.serve(async (req) => {
   const secret = Deno.env.get('REVENUECAT_WEBHOOK_SECRET');
-  const authHeader = req.headers.get('authorization');
-  if (!secret || authHeader !== secret) {
+  if (!secret || !secretMatches(req.headers.get('authorization'), secret)) {
     return new Response('Unauthorized', { status: 401 });
   }
 
@@ -45,9 +66,32 @@ Deno.serve(async (req) => {
     return new Response('Invalid JSON', { status: 400 });
   }
 
+  const supabase = createClient(
+    Deno.env.get('SUPABASE_URL')!,
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+  );
+
+  // TRANSFER moves an entitlement between app users. Skipping it used to leave
+  // the losing account marked active forever, so revoke there explicitly; the
+  // gaining account is refreshed by the purchase events that follow.
+  if (event.type === 'TRANSFER') {
+    const losers = (event.transferred_from ?? []).filter((id) => !id.startsWith('$RCAnonymousID:'));
+    if (losers.length > 0) {
+      const { error } = await supabase
+        .from('subscriptions')
+        .update({ status: 'expired', updated_at: new Date().toISOString() })
+        .in('user_id', losers);
+      if (error) {
+        console.error('transfer revoke failed', error);
+        return new Response('Sync failed', { status: 500 });
+      }
+    }
+    return new Response(JSON.stringify({ transferred: losers.length }), { status: 200 });
+  }
+
   const status = STATUS_BY_EVENT[event.type];
   if (!status) {
-    // TEST, TRANSFER, etc. — acknowledge so RevenueCat stops retrying.
+    // TEST, SUBSCRIBER_ALIAS, etc. — acknowledge so RevenueCat stops retrying.
     return new Response(JSON.stringify({ skipped: event.type }), { status: 200 });
   }
 
@@ -57,14 +101,9 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({ skipped: 'anonymous user' }), { status: 200 });
   }
 
-  const supabase = createClient(
-    Deno.env.get('SUPABASE_URL')!,
-    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
-  );
-
   const { error } = await supabase.from('subscriptions').upsert({
     user_id: event.app_user_id,
-    entitlement: event.entitlement_ids?.[0] ?? 'premium',
+    entitlement: event.entitlement_ids?.[0] ?? DEFAULT_ENTITLEMENT,
     product_id: event.product_id,
     status,
     current_period_ends_at: event.expiration_at_ms

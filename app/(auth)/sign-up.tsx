@@ -29,7 +29,7 @@ export default function SignUpScreen() {
 
   if (confirmationSent) {
     return (
-      <Screen className="justify-center">
+      <Screen scrollable>
         <View className="gap-2">
           <Text variant="title">Check your email</Text>
           <Text className="text-foreground-secondary">
@@ -44,7 +44,7 @@ export default function SignUpScreen() {
   }
 
   return (
-    <Screen className="justify-center">
+    <Screen scrollable>
       <View className="gap-4">
         <View className="gap-1">
           <Text variant="display">Create account</Text>

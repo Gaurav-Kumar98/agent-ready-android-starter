@@ -1,15 +1,13 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
-import { Sentry } from '@/lib/sentry';
+import { toScreenQuery, UserFacingError } from '@/lib/query';
 import { supabase } from '@/lib/supabase';
 import type { Tables } from '@/types/database';
 
 export type Profile = Tables<'profiles'>;
 
-type ProfileState = {
-  data: Profile | null;
-  isLoading: boolean;
-  error: string | null;
+export const profileKeys = {
+  detail: (userId: string | undefined) => ['profile', userId] as const,
 };
 
 /**
@@ -18,59 +16,45 @@ type ProfileState = {
  * the auth feature itself.
  */
 export function useProfile(userId: string | undefined) {
-  const [state, setState] = useState<ProfileState>({ data: null, isLoading: true, error: null });
-
-  const fetchProfile = useCallback(async (): Promise<ProfileState> => {
-    if (!userId) {
-      return { data: null, isLoading: false, error: null };
-    }
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .maybeSingle();
-    if (error) {
-      Sentry.captureException(error);
-      return {
-        data: null,
-        isLoading: false,
-        error: "Couldn't load your profile. Check your connection and try again.",
-      };
-    }
-    return { data, isLoading: false, error: null };
-  }, [userId]);
-
-  useEffect(() => {
-    let cancelled = false;
-    fetchProfile().then((next) => {
-      if (!cancelled) {
-        setState(next);
+  const query = useQuery({
+    queryKey: profileKeys.detail(userId),
+    enabled: Boolean(userId),
+    queryFn: async (): Promise<Profile | null> => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId as string)
+        .maybeSingle();
+      if (error) {
+        throw new UserFacingError(
+          "Couldn't load your profile. Check your connection and try again.",
+          { cause: error },
+        );
       }
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [fetchProfile]);
+      return data;
+    },
+  });
 
-  const refetch = useCallback(async () => {
-    setState((prev) => ({ ...prev, isLoading: true, error: null }));
-    setState(await fetchProfile());
-  }, [fetchProfile]);
-
-  return { ...state, refetch };
+  return toScreenQuery(query);
 }
 
-export async function updateDisplayName(
-  userId: string,
-  displayName: string,
-): Promise<{ error: string | null }> {
-  const { error } = await supabase
-    .from('profiles')
-    .update({ display_name: displayName })
-    .eq('id', userId);
-  if (error) {
-    Sentry.captureException(error);
-    return { error: "Couldn't save your changes. Check your connection and try again." };
-  }
-  return { error: null };
+/** Saves the display name and refreshes the cached profile on success. */
+export function useUpdateDisplayName(userId: string | undefined) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (displayName: string) => {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ display_name: displayName })
+        .eq('id', userId as string);
+      if (error) {
+        throw new UserFacingError(
+          "Couldn't save your changes. Check your connection and try again.",
+          { cause: error },
+        );
+      }
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: profileKeys.detail(userId) }),
+  });
 }

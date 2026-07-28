@@ -1,53 +1,34 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import Purchases, { type PurchasesOffering } from 'react-native-purchases';
 
+import { toScreenQuery, UserFacingError } from '@/lib/query';
 import { isRevenueCatConfigured } from '@/lib/revenuecat';
-import { Sentry } from '@/lib/sentry';
 
-type OfferingsState = {
-  data: PurchasesOffering | null;
-  isLoading: boolean;
-  error: string | null;
+export const purchaseKeys = {
+  offerings: ['purchases', 'offerings'] as const,
+  customerInfo: ['purchases', 'customer-info'] as const,
 };
 
 /** The current RevenueCat offering (packages shown on the paywall). */
 export function useOfferings() {
-  const [state, setState] = useState<OfferingsState>({ data: null, isLoading: true, error: null });
-
-  const fetchOfferings = useCallback(async (): Promise<OfferingsState> => {
-    // Template not wired to RevenueCat yet — paywall shows its empty state.
-    if (!isRevenueCatConfigured()) {
-      return { data: null, isLoading: false, error: null };
-    }
-    try {
-      const offerings = await Purchases.getOfferings();
-      return { data: offerings.current, isLoading: false, error: null };
-    } catch (e) {
-      Sentry.captureException(e);
-      return {
-        data: null,
-        isLoading: false,
-        error: "Couldn't load subscription options. Check your connection and try again.",
-      };
-    }
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-    fetchOfferings().then((next) => {
-      if (!cancelled) {
-        setState(next);
+  const query = useQuery({
+    queryKey: purchaseKeys.offerings,
+    queryFn: async (): Promise<PurchasesOffering | null> => {
+      // Template not wired to RevenueCat yet — paywall shows its empty state.
+      if (!isRevenueCatConfigured()) {
+        return null;
       }
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [fetchOfferings]);
+      try {
+        const offerings = await Purchases.getOfferings();
+        return offerings.current;
+      } catch (e) {
+        throw new UserFacingError(
+          "Couldn't load subscription options. Check your connection and try again.",
+          { cause: e },
+        );
+      }
+    },
+  });
 
-  const refetch = useCallback(async () => {
-    setState((prev) => ({ ...prev, isLoading: true, error: null }));
-    setState(await fetchOfferings());
-  }, [fetchOfferings]);
-
-  return { ...state, refetch };
+  return toScreenQuery(query);
 }

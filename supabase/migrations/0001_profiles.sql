@@ -4,9 +4,12 @@
 -- ---------------------------------------------------------------------------
 -- updated_at bookkeeping
 -- ---------------------------------------------------------------------------
+-- search_path is pinned on every function here: without it a caller can put a
+-- malicious schema ahead of public and hijack unqualified references.
 create or replace function public.set_updated_at()
 returns trigger
 language plpgsql
+set search_path = ''
 as $$
 begin
   new.updated_at = now();

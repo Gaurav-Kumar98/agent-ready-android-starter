@@ -42,9 +42,9 @@ export default function PaywallScreen() {
   if (isLoading) {
     return (
       <Screen className="gap-3 pt-4">
-        <Skeleton className="h-8 w-12" />
-        <Skeleton className="h-12" />
-        <Skeleton className="h-12" />
+        <Skeleton className="h-8 w-1/2" />
+        <Skeleton className="h-12 w-full" />
+        <Skeleton className="h-12 w-full" />
       </Screen>
     );
   }

@@ -24,7 +24,7 @@ export default function SignInScreen() {
   };
 
   return (
-    <Screen className="justify-center">
+    <Screen scrollable>
       <View className="gap-4">
         <View className="gap-1">
           <Text variant="display">Welcome back</Text>
