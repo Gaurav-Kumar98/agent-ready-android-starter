@@ -53,10 +53,18 @@ jobs:
           echo "repaired=true" >> "$GITHUB_OUTPUT"
 
       # Only same-repo pull requests: a fork's branch is not ours to write to,
-      # and main is not a place to land an unreviewed commit. Pushes made with
-      # GITHUB_TOKEN do not trigger another workflow run, so this cannot loop —
-      # the current run continues with the repaired tree and still reports on
-      # typecheck, lint and tests.
+      # and main is not a place to land an unreviewed commit.
+      #
+      # This cannot loop. The push does queue a follow-up pull_request run, but
+      # GitHub leaves runs triggered by GITHUB_TOKEN at `action_required` and
+      # executes no jobs, so nothing re-enters this step. It does leave one
+      # greyed-out check on the PR, which is safe to ignore — the run that
+      # matters is this one, which continues with the repaired tree and still
+      # reports on typecheck, lint and tests.
+      #
+      # Verified end to end by desyncing the lockfile on a scratch branch:
+      # install failed, the lockfile was repaired and pushed, and all three
+      # checks then ran green.
       - name: Commit repaired lockfile
         if: >-
           steps.install.outputs.repaired == 'true'
