@@ -10,7 +10,11 @@ export type ScreenProps = ViewProps & {
    * roughly half the viewport and will otherwise hide the submit button.
    */
   scrollable?: boolean;
-  /** Extra classes for the scroll content container when `scrollable`. */
+  /**
+   * Extra classes for the scroll content container when `scrollable`. Rarely
+   * needed: `className` already styles the content box in both branches, so
+   * reach for this only to override a default (`grow justify-center px-4`).
+   */
   contentClassName?: string;
 };
 
@@ -31,8 +35,13 @@ export function Screen({
     );
   }
 
+  // `className` goes on the scroll *content*, not the SafeAreaView. The
+  // SafeAreaView's only child is the KeyboardAvoidingView, so layout classes
+  // callers pass for their content — `gap-*`, `justify-*`, `items-*` — would
+  // silently do nothing there. This keeps `className` meaning the same thing in
+  // both branches: it styles the box the children live in.
   return (
-    <SafeAreaView edges={edges} className={`flex-1 bg-background ${className}`} {...props}>
+    <SafeAreaView edges={edges} className="flex-1 bg-background" {...props}>
       <KeyboardAvoidingView
         className="flex-1"
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -40,7 +49,7 @@ export function Screen({
         <ScrollView
           testID="screen-scroll"
           className="flex-1"
-          contentContainerClassName={`grow justify-center px-4 ${contentClassName}`}
+          contentContainerClassName={`grow justify-center px-4 ${className} ${contentClassName}`}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="interactive"
           showsVerticalScrollIndicator={false}

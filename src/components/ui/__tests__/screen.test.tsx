@@ -28,6 +28,18 @@ describe('Screen', () => {
     expect(screen.getByText('Password')).toBeTruthy();
   });
 
+  it('styles the content box with className when scrollable, not the outer wrapper', async () => {
+    await render(
+      <Screen scrollable className="gap-4">
+        <RNText>Spaced</RNText>
+      </Screen>,
+    );
+
+    // The SafeAreaView's only child is the KeyboardAvoidingView, so layout
+    // classes left there (gap/justify/items) would silently do nothing.
+    expect(screen.getByTestId('screen-scroll').props.contentContainerClassName).toContain('gap-4');
+  });
+
   it('does not add a scroll view by default', async () => {
     await render(
       <Screen>
