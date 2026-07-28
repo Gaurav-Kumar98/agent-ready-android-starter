@@ -17,7 +17,9 @@ const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
 
 // Placeholders keep createClient happy so the app can boot far enough to show
-// the setup screen. No request is ever made against them.
+// the setup screen. Nothing drives traffic to them: the root layout renders the
+// setup screen instead of the app, and the auto-refresh listener below stays
+// unregistered while unconfigured.
 const PLACEHOLDER_URL = 'http://127.0.0.1:54321';
 const PLACEHOLDER_ANON_KEY = 'missing-anon-key';
 
@@ -44,10 +46,14 @@ export const supabase = createClient<Database>(
 );
 
 // Refresh tokens only while the app is foregrounded (Supabase-recommended).
-AppState.addEventListener('change', (state) => {
-  if (state === 'active') {
-    supabase.auth.startAutoRefresh();
-  } else {
-    supabase.auth.stopAutoRefresh();
-  }
-});
+// Skipped entirely when unconfigured: there is no session to refresh against a
+// placeholder URL, and starting the timer would contradict the note above.
+if (isSupabaseConfigured) {
+  AppState.addEventListener('change', (state) => {
+    if (state === 'active') {
+      supabase.auth.startAutoRefresh();
+    } else {
+      supabase.auth.stopAutoRefresh();
+    }
+  });
+}
