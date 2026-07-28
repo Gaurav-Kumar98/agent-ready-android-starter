@@ -48,8 +48,19 @@ export function useEntitlement(entitlement: EntitlementId = ENTITLEMENTS.premium
     };
   }, [queryClient]);
 
+  // `null` means "we do not know yet" — still loading, or the lookup failed.
+  // Collapsing that to `false` would be a silent downgrade: a screen gating on
+  // this alone would show a paying user the upsell whenever RevenueCat is
+  // unreachable. Callers must treat `null` separately from `false`.
+  const data: boolean | null =
+    query.data === undefined
+      ? null
+      : query.data === null
+        ? false // RevenueCat not configured — free tier, and we do know that.
+        : query.data.entitlements.active[entitlement] !== undefined;
+
   return {
-    data: query.data ? query.data.entitlements.active[entitlement] !== undefined : false,
+    data,
     isLoading: query.isLoading,
     error: query.isError ? messageFor(query.error) : null,
     refetch: () => {
