@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "FILE=$(jq -r '.tool_input.file_path // empty'); if [ -n \"$FILE\" ] && echo \"$FILE\" | grep -qE '\\.(ts|tsx|js|jsx|json)$'; then npx prettier --write \"$FILE\" 2>/dev/null; npx eslint --fix \"$FILE\" 2>/dev/null; fi; exit 0"
+            "command": "node .claude/hooks/format.mjs"
           }
         ]
       }
@@ -17,7 +17,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "FILE=$(jq -r '.tool_input.file_path // empty'); if echo \"$FILE\" | grep -qE '(^|/)\\.env'; then echo 'Blocked: never edit .env files directly. Tell the user what to add instead.' >&2; exit 2; fi; exit 0"
+            "command": "node .claude/hooks/guard-env.mjs"
           }
         ]
       },
@@ -26,7 +26,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "CMD=$(jq -r '.tool_input.command // empty'); if echo \"$CMD\" | grep -qE 'rm -rf (/|~)|supabase db reset --linked|eas submit|DROP TABLE'; then echo 'Blocked by project safety hook.' >&2; exit 2; fi; exit 0"
+            "command": "node .claude/hooks/guard-bash.mjs"
           }
         ]
       }
@@ -36,7 +36,9 @@
         "hooks": [
           {
             "type": "command",
-            "command": "INPUT=$(cat); if [ \"$(echo \"$INPUT\" | jq -r '.stop_hook_active')\" = 'true' ]; then exit 0; fi; npx tsc --noEmit >/tmp/tsc-out 2>&1 || { echo 'TypeScript errors remain — fix before finishing:' >&2; head -30 /tmp/tsc-out >&2; exit 2; }"
+            "command": "node .claude/hooks/typecheck.mjs",
+            "timeout": 180,
+            "statusMessage": "Typechecking…"
           }
         ]
       }

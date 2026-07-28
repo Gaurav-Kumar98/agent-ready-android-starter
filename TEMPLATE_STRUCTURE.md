@@ -8,9 +8,16 @@ new-app-to-first-emulator-run in under 30 minutes.
 
 ```
 expo-android-template/
-├── CLAUDE.md                      # The contract Claude Code works under
+├── AGENTS.md                      # The contract every coding agent works under
+├── CLAUDE.md                      # One-line pointer to AGENTS.md
 ├── .claude/
-│   └── settings.json              # Hooks: auto-format, safety guards, tsc gate on Stop
+│   ├── settings.json              # Hooks: auto-format, safety guards, tsc gate on Stop
+│   └── hooks/                     # Node-only hook scripts (no jq dependency)
+│       ├── lib.mjs                # stdin parsing; blocks on unreadable payloads
+│       ├── guard-env.mjs          # refuses edits to .env
+│       ├── guard-bash.mjs         # blocks rm -rf /, DROP, eas build/submit/update
+│       ├── format.mjs             # prettier + eslint --fix on the written file
+│       └── typecheck.mjs          # tsc gate on Stop, with loop guard
 ├── app/                           # Expo Router — routes only
 │   ├── _layout.tsx                # Root: providers (Auth, RevenueCat, Theme), Sentry init
 │   ├── (auth)/                    # Unauthenticated group
@@ -27,6 +34,8 @@ expo-android-template/
 │   ├── components/
 │   │   └── ui/                    # Button, Text, Input, Card, Screen, Skeleton,
 │   │                              # EmptyState, ErrorState — the design system
+│   │       ├── switch.tsx         # reference: wrapping a headless gluestack primitive
+│   │       └── animated.tsx       # Reanimated view registered for className support
 │   ├── features/
 │   │   ├── auth/                  # useAuth, session handling, sign-in/out logic
 │   │   ├── purchases/             # usePurchases, useEntitlement, products.ts
@@ -34,6 +43,8 @@ expo-android-template/
 │   ├── lib/
 │   │   ├── supabase.ts            # Typed client, SecureStore-backed session storage
 │   │   ├── revenuecat.ts          # Purchases.configure, log-in/out sync with auth
+│   │   ├── query.ts               # QueryClient + central Sentry reporting
+│   │   ├── query-state.ts         # UserFacingError, toScreenQuery (pure, unit-tested)
 │   │   └── sentry.ts
 │   ├── hooks/
 │   └── types/
@@ -41,13 +52,15 @@ expo-android-template/
 ├── supabase/
 │   ├── config.toml
 │   ├── migrations/
-│   │   └── 0001_profiles.sql      # profiles + subscriptions tables, RLS from line 1
+│   │   ├── 0001_profiles.sql      # profiles + subscriptions tables, RLS from line 1
+│   │   └── 0002_avatars_storage.sql # avatars bucket, per-user path policies
 │   └── functions/
 │       └── revenuecat-webhook/    # Syncs entitlement events → subscriptions table
 │           └── index.ts
 ├── .maestro/
 │   ├── smoke.yaml                 # App launches, home renders
-│   └── auth.yaml                  # Sign up → land on home
+│   ├── auth.yaml                  # Sign up → land on home
+│   └── keyboard.yaml              # Submit button stays reachable with keyboard up
 ├── assets/                        # Icon, splash (replace per app)
 ├── tailwind.config.js             # Semantic tokens: surface, primary, text-*, spacing scale
 ├── app.config.ts                  # Dynamic config; reads env for IDs, wires Sentry plugin
@@ -55,9 +68,9 @@ expo-android-template/
 ├── .env.example                   # Every EXPO_PUBLIC_ var documented, no values
 ├── .github/
 │   └── workflows/
-│       └── ci.yml                 # typecheck + lint + test on PR (CodeRabbit reviews the diff)
+│       └── ci.yml                 # typecheck + lint + test on PR; self-heals a rejected lockfile
 ├── tsconfig.json                  # strict: true, path alias @/* → src/*
-├── .eslintrc.js / .prettierrc
+├── eslint.config.js / .prettierrc
 └── package.json
 ```
 
@@ -86,7 +99,7 @@ npx expo run:android          # local build → installs dev client on emulator
 curl -Ls https://get.maestro.mobile.dev | bash
 
 # 6. Push to GitHub → Settings → mark as "Template repository"
-#    Enable CodeRabbit on the repo (free tier reviews will be summaries only)
+#    Review happens on demand from Claude Code (/review <PR#>), not via a bot
 ```
 
 ## Per-app checklist (every clone)
@@ -124,8 +137,31 @@ curl -Ls https://get.maestro.mobile.dev | bash
   entirely while iterating; `db push` promotes the schema when an app goes live.
 - **`subscriptions` table synced by webhook**: lets Postgres/RLS gate premium
   data server-side instead of trusting the client's entitlement cache.
-- **Hooks + CLAUDE.md split**: CLAUDE.md is advisory (Claude can drift);
+- **One AGENTS.md, not one file per agent**: the rules are the same whichever
+  agent is driving, and duplicated contracts drift apart. `CLAUDE.md` is a
+  pointer so Claude Code still auto-loads it.
+- **Hooks + AGENTS.md split**: AGENTS.md is advisory (an agent can drift);
   hooks are deterministic (they run every time). Rules that must never break —
   formatting, .env protection, tsc passing at stop — live in hooks.
-- **CI runs checks, CodeRabbit reviews style/logic**: CodeRabbit never executes
-  code, so CI is the only thing proving the app still compiles.
+- **Hooks are Node scripts, and fail closed**: the original hooks piped stdin
+  through `jq`. On a machine without `jq` the command substitution produced an
+  empty string, every guard fell through to `exit 0`, and the "non-negotiable"
+  protections silently allowed exactly what they existed to block — with no
+  error anywhere. Node is already required to run the app, so the guards depend
+  on nothing else, and an unparseable payload now blocks rather than allows.
+- **CI runs checks, a human triggers review**: CI is the only thing proving the
+  app still compiles. Review is `/review <PR#>` from Claude Code on the open PR
+  — deliberately not a bot on the PR, because an agent reporting that its own
+  work was reviewed is worth nothing. Whoever merges runs the review.
+- **CI self-heals a rejected lockfile**: `npm ci` refuses to install when
+  package-lock.json disagrees with package.json, and on this project the two
+  can disagree purely because of where the lock was generated — npm on Linux
+  expects the peer deps of optional packages in the lockfile, npm on Windows
+  declines to write them. A solo developer on Windows would hit a red CI every
+  time they added a dependency, so CI regenerates the lock, pushes the fix back
+  to the PR branch, and carries on with the real checks instead of stopping at
+  the install step.
+- **gluestack for behaviour, not looks**: v5 is headless, so it supplies focus
+  traps, ARIA state and toggle semantics while the local tokens supply every
+  pixel. That is the only way to add a component library to an opinionated
+  design system without ending up with two Buttons that disagree.

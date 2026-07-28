@@ -5,4 +5,5 @@ export { ErrorState, type ErrorStateProps } from './error-state';
 export { Input, type InputProps } from './input';
 export { Screen, type ScreenProps } from './screen';
 export { Skeleton, type SkeletonProps } from './skeleton';
+export { Switch, type SwitchProps } from './switch';
 export { Text, type TextProps, type TextVariant } from './text';

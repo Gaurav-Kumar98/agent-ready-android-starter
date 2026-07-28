@@ -1,0 +1,22 @@
+# The sign-in form must stay usable while the soft keyboard is open.
+# On a 360px-wide Android the keyboard covers roughly half the viewport, so a
+# non-scrolling centred form hides the submit button entirely.
+appId: com.example.expoandroidtemplate
+---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible: 'Welcome back'
+    timeout: 30000
+- tapOn:
+    id: 'email-input'
+- inputText: 'keyboard-check@example.com'
+- tapOn:
+    id: 'password-input'
+- inputText: 'test-password-123'
+# With the keyboard still up, the submit button must remain reachable.
+- assertVisible:
+    id: 'sign-in-button'
+- hideKeyboard
+- assertVisible:
+    id: 'sign-in-button'

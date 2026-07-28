@@ -34,8 +34,17 @@ export default function SettingsScreen() {
       </Card>
       <Card className="gap-2">
         <Text variant="caption">Subscription</Text>
-        <Text>{isEntitlementLoading ? 'Checking…' : isPremium ? 'Premium' : 'Free plan'}</Text>
-        {!isPremium && !isEntitlementLoading ? (
+        <Text>
+          {isEntitlementLoading
+            ? 'Checking…'
+            : isPremium === null
+              ? 'Unavailable'
+              : isPremium
+                ? 'Premium'
+                : 'Free plan'}
+        </Text>
+        {/* Only when we know they are not subscribed — see useEntitlement. */}
+        {isPremium === false ? (
           <Button
             variant="secondary"
             label="Upgrade to Premium"

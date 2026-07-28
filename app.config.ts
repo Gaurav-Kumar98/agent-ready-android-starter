@@ -29,9 +29,17 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     },
     predictiveBackGestureEnabled: false,
   },
+  // `fingerprint` derives the runtime version from the native dependency tree,
+  // so an OTA update can never land on a build with incompatible native code.
+  // `eas init` fills in updates.url + extra.eas.projectId on first link.
+  runtimeVersion: { policy: 'fingerprint' },
   plugins: [
     'expo-router',
     'expo-secure-store',
+    'expo-font',
+    'expo-updates',
+    // Pins every native module to one NDK — see the file for why.
+    './plugins/with-android-native-build',
     [
       'expo-splash-screen',
       {

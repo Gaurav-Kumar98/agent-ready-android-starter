@@ -1,0 +1,272 @@
+# AGENTS.md — Expo Android App Template
+
+You are working on a production Android app built with Expo. Every rule below is
+a constraint, not a suggestion. If a rule conflicts with the fastest path to
+"working code", the rule wins.
+
+This is the single contract for every coding agent working in this repo.
+`CLAUDE.md` points here; do not duplicate rules into agent-specific files.
+
+## Who you are working with
+
+A solo developer. There is no second pair of eyes and no reviewer waiting
+downstream — the checks in this file *are* the review. That has two
+consequences:
+
+- **Finish the job.** Don't hand back a half-built feature with a list of
+  things left to do. If part of the scope is genuinely blocked, complete
+  everything else and say plainly what you left and why.
+- **Don't ask what you can determine.** Read the code, make the routine call,
+  and note the assumption. Save the questions for decisions that would be
+  expensive to undo — schema shape, pricing, anything that ships to users.
+
+## Stack (do not substitute without being asked)
+
+- Expo SDK (managed workflow) + TypeScript (strict) + Expo Router (file-based routing)
+- NativeWind for styling — Tailwind classes only, no `StyleSheet.create`, no inline style objects except for dynamic values that cannot be expressed as classes
+- gluestack UI v5 (`@gluestack-ui/core`) for headless behaviour + accessibility on complex primitives
+- Reanimated 4 (with `react-native-worklets`) for animation
+- TanStack React Query for all server state (caching, retries, dedup, refetch)
+- Supabase: Postgres + Auth + Storage + Edge Functions
+- RevenueCat for all monetization (wraps Google Play Billing)
+- Sentry for error monitoring
+- `expo-updates` for OTA, with a fingerprint runtime version
+- Maestro for E2E tests, Jest + React Native Testing Library for unit tests
+
+## Commands
+
+- `npm run start` — dev server (dev client, not Expo Go)
+- `npm run android` — build + launch dev client on emulator
+- `npm run typecheck` — `tsc --noEmit` (must pass before any task is "done")
+- `npm run lint` — ESLint (must pass before any task is "done")
+- `npm run test` — Jest unit tests
+- `npm run e2e` — Maestro flows in `.maestro/` against the running emulator
+- `npx expo-doctor` — dependency/config health; must stay at 20/20
+- `npx supabase db diff -f <name>` — generate migration after schema changes
+- `npm run db:types` — regenerate `src/types/database.ts` from Supabase schema
+
+## Architecture
+
+```
+app/                  # Expo Router routes ONLY — thin screens, no business logic
+src/components/ui/    # Design-system primitives (Button, Card, Text, Input...)
+src/components/       # Composed feature components
+src/features/<name>/  # Feature logic: hooks, services, types per feature
+src/lib/              # Clients: supabase.ts, revenuecat.ts, sentry.ts, query.ts
+src/hooks/            # Shared hooks
+src/types/            # Shared types incl. generated database.ts
+supabase/migrations/  # SQL migrations (source of truth for schema)
+supabase/functions/   # Edge Functions (webhooks, server-side logic)
+plugins/              # Expo config plugins — the only durable way to touch android/
+.maestro/             # E2E flows
+```
+
+Rules:
+
+- Screens in `app/` may only compose components and call feature hooks. Data
+  fetching, mutations, and business rules live in `src/features/`.
+- Never import `src/features/A` from `src/features/B`. Shared logic moves to
+  `src/lib/` or `src/hooks/`.
+- Every data-fetching hook returns `{ data, isLoading, error }` and every screen
+  renders all three states plus an empty state. A screen with no loading/error
+  handling is incomplete, even if it "works".
+- Server state goes through React Query — never a hand-rolled
+  `useState` + `useEffect` fetch. Wrap the `useQuery` result in `toScreenQuery`
+  (`src/lib/query.ts`) to get the contract above. Mutations use `useMutation`
+  and invalidate the affected query key on success.
+- A `queryFn` that fails throws `UserFacingError` with copy written for a human.
+  Anything else that escapes is reported to Sentry and shown as generic copy,
+  so a raw Postgres or RevenueCat message can never reach the screen. Do not
+  call `Sentry.captureException` inside a `queryFn` — the shared `queryCache`
+  already reports every failure.
+
+## Design system — this is why the apps look good
+
+- Use ONLY tokens defined in `tailwind.config.js` (colors, spacing, radii,
+  font sizes). Never hardcode hex values or arbitrary pixel values like
+  `p-[13px]`. If a needed token doesn't exist, add it to the config first.
+- Spacing scale: 4 / 8 / 12 / 16 / 24 / 32 / 48. Nothing else.
+- Typography goes through the `<Text>` primitive in `src/components/ui/` with
+  its `variant` prop (`display`, `title`, `body`, `caption`). Never use raw
+  React Native `Text` in screens.
+- Touch targets: minimum 44x44. Interactive elements give pressed-state
+  feedback (opacity or scale).
+- Every screen respects safe areas (`react-native-safe-area-context`) and is
+  tested at 360px width (common budget Android) — no horizontal overflow.
+- Any screen containing a text input uses `<Screen scrollable>`. The soft
+  keyboard covers roughly half a 360px-tall viewport; a centred, non-scrolling
+  form hides its own submit button.
+- Sizing classes follow the token scale, so `w-12` is 48px, not "half the
+  screen". Use `w-full` / `w-1/2` / `w-3/4` for proportional widths —
+  particularly in skeletons, where a token width silently renders a stub.
+- Dark mode is supported from day one: only semantic color tokens
+  (`bg-surface`, `text-primary`), never `bg-white` / `text-black`.
+- Lists longer than ~20 items use `FlashList`, never `ScrollView` + `map`.
+- Images: use `expo-image` with a `placeholder` (blurhash) and explicit
+  dimensions. No layout shift.
+- Inputs are labelled for screen readers: the visible label is wired to the
+  field, not just rendered above it.
+
+### gluestack UI v5 — behaviour, not looks
+
+gluestack v5 is headless. A `create*` factory owns the behaviour and the
+accessibility semantics and hands them to a `Root` you style yourself. The
+split is: **gluestack decides how it behaves, `tailwind.config.js` decides how
+it looks, Reanimated decides how it moves.**
+
+- Reach for gluestack when a primitive has real interaction semantics worth not
+  reinventing — Actionsheet, Modal, AlertDialog, Select, Popover, Toast,
+  Checkbox, Radio, Slider, Tabs. Focus traps, escape handling and ARIA state
+  are exactly the things hand-rolled components get wrong.
+- Do **not** reach for it for a styled box. `Button`, `Card`, `Text`, `Input`,
+  `Screen` stay hand-rolled — a second Button is how a design system dies.
+- **Never import `@gluestack-ui/*` inside `app/`.** Wrap it in
+  `src/components/ui/` so screens keep importing from one place and the token
+  rules above still apply. `src/components/ui/switch.tsx` is the reference.
+- gluestack ships untranspiled ESM, so any new gluestack subpath may need
+  adding to `esmPackages` in `jest.config.js`.
+
+### Reanimated
+
+- `babel-preset-expo` wires `react-native-worklets/plugin` automatically when
+  the package is installed. Do not add it to `babel.config.js` by hand.
+- Reanimated components ignore `className` — NativeWind only auto-registers a
+  few libraries, and an unregistered component drops the prop silently, so
+  styles just never apply. Import `AnimatedView` from
+  `src/components/ui/animated.tsx` instead of `Animated.View`.
+- Any looping or decorative animation checks `useReducedMotion()` first. A
+  pulsing screen is a vestibular trigger, not a nice touch.
+- Animate transforms and opacity. Animating layout or colour means resolving
+  token values in JS, which defeats the theming system — switch classes
+  conditionally instead (see `switch.tsx`).
+
+## Native Android builds
+
+`android/` is generated by prebuild and gitignored. Never hand-edit it — the
+change is gone on the next `expo prebuild`. Anything that must persist goes in a
+config plugin under `plugins/`, registered in `app.config.ts`.
+`plugins/with-android-native-build.ts` is the reference.
+
+- **Keep the repo on a short path.** CMake names every object file after the
+  *absolute* path of its source, so the project root gets embedded inside an
+  already-deep `.cxx` path, and ninja checks that path — relative to the build
+  directory — against Windows' 260-character limit. At a 67-character root
+  (`C:\Users\...\OneDrive\Documents\...`) the worst case was 274 and no C++
+  compiled at all. `C:\dev\<app>` leaves ~80 characters of headroom. OneDrive is
+  doubly wrong for this: the depth breaks the build, and its sync also locks
+  build outputs under `node_modules` mid-build (`Unable to delete file
+  ... classes.jar`).
+- Two plausible fixes for that limit do **not** work; don't spend time on them.
+  The `LongPathsEnabled` registry key is ignored, because the ninja bundled with
+  the SDK's CMake 3.22.1 is 1.10.2 — no `longPathAware` manifest, no
+  `RtlAreLongPathsEnabled` call — so it enforces 260 unconditionally. And
+  `CMAKE_OBJECT_PATH_MAX` does reach CMake, but the shortening it triggers is a
+  Makefile-generator feature that the Ninja generator ignores.
+- **Pin `ndkVersion` on every module.** Expo sets `rootProject.ext.ndkVersion`
+  and `android/app/build.gradle` reads it, but native library modules
+  (`expo-updates`, and any other `com.android.library` with an
+  `externalNativeBuild`) do not, so they fall back to AGP's own default and
+  Gradle downloads a second multi-gigabyte NDK. If that download is interrupted
+  it leaves a stub directory with no `source.properties`, and every later build
+  fails with `[CXX1101] NDK at ... did not have a source.properties file`.
+  Delete the stub directory to recover.
+- CMake settings cannot be applied from a root-level `subprojects` block — AGP
+  snapshots the CMake model during `finalizeDsl`, before that block gets to
+  append. Use `withAppBuildGradle` for anything under `externalNativeBuild`, and
+  keep the root `subprojects` block for plain DSL properties like `ndkVersion`.
+- A stale `.cxx` can be restored from the Gradle build cache carrying an
+  outdated CMake command line. After changing anything that affects the CMake
+  configure, delete `android/app/.cxx` and confirm the argument actually landed
+  in `.cxx/**/metadata_generation_command.txt` before concluding it had no
+  effect.
+
+## Supabase rules
+
+- Row Level Security is enabled on EVERY table. A migration that creates a
+  table without RLS policies in the same file is wrong.
+- The client uses the anon key only. The service-role key exists exclusively
+  inside Edge Function secrets — if it appears anywhere under `src/` or `app/`,
+  that is a critical bug.
+- All queries go through the typed client (`Database` generic from
+  `src/types/database.ts`). After any schema change: run the migration, then
+  `npm run db:types`, then fix resulting type errors.
+- Storage: user uploads go to per-user paths (`{user_id}/...`) with storage
+  policies enforcing ownership. `supabase/migrations/0002_avatars_storage.sql`
+  is the pattern to copy for any new bucket.
+- Every SQL function declares `set search_path = ''` and schema-qualifies its
+  references, `security definer` or not.
+
+## Payments (RevenueCat)
+
+- Feature gating reads RevenueCat entitlements (`customerInfo.entitlements`),
+  never a homegrown `is_premium` boolean as the source of truth.
+- The client is never trusted for premium status in backend logic: Supabase
+  data access for premium features is validated server-side via the RevenueCat
+  webhook → Edge Function → `subscriptions` table sync.
+- Wrap all purchase calls in try/catch handling `PURCHASE_CANCELLED` silently
+  and reporting other errors to Sentry.
+- Never hardcode product IDs in components — they live in
+  `src/features/purchases/products.ts`.
+- Webhook secrets are compared in constant time, and every event type that
+  changes entitlement ownership (including `TRANSFER`) updates the
+  `subscriptions` table. Silently skipping an event leaves a stale row that
+  grants premium forever.
+
+## Errors & monitoring
+
+- No silent `catch` blocks. Every catch either handles the error meaningfully
+  or reports it: `Sentry.captureException(e)` plus a user-visible fallback.
+- Render-time crashes are caught by the `ErrorBoundary` exported from
+  `app/_layout.tsx`. Reporting a crash is not enough — the user must see
+  something other than a white screen.
+- User-facing error copy is human ("Couldn't save your changes. Check your
+  connection and try again."), never raw error messages or codes.
+- Never `throw` at module scope for missing configuration. The app must boot
+  far enough to explain what is wrong — see the setup screen in
+  `app/_layout.tsx` and `isSupabaseConfigured` in `src/lib/supabase.ts`.
+
+## Security & secrets
+
+- `EXPO_PUBLIC_*` env vars are bundled into the shipped app and are PUBLIC.
+  Only the Supabase URL, Supabase anon key, RevenueCat public API key, and
+  Sentry DSN may use this prefix. Anything else secret goes in EAS Secrets or
+  Supabase Edge Function secrets.
+- Never read, print, or commit `.env*` files. Never commit `google-services.json`
+  credentials beyond what the template already tracks.
+
+## Workflow expectations
+
+- Work in small increments. After each meaningful change: typecheck and lint
+  must pass. Do not fight the hooks — fix the code.
+- The guards in `.claude/hooks/` are plain Node scripts wired up by
+  `.claude/settings.json` (Claude Code). They depend on nothing but Node, so
+  they cannot silently no-op on a machine that is missing extra tooling, and
+  they fail closed: an unreadable payload blocks the action rather than
+  allowing it. If you add a guard, keep both properties.
+- Before declaring any task done: `npm run typecheck && npm run lint && npm run test`,
+  and for UI changes, state which screen/flow you verified on the emulator and
+  update or add the relevant Maestro flow in `.maestro/`.
+- Report honestly. If you could not run something — no emulator, no Maestro
+  installed — say so instead of implying it passed.
+- Commits: Conventional Commits (`feat:`, `fix:`, `chore:`...). Keep PRs under
+  ~400 changed lines so a review pass stays useful.
+- Review is human-triggered and separate from CI. The developer runs
+  `/review <PR number>` from Claude Code on the open PR, or
+  `/code-review ultra <PR number>` for the deeper multi-agent pass. **You
+  cannot review your own PR and must never report that a review happened.**
+  Open the PR, say it is ready for review, and stop there.
+- CI repairs a lockfile that `npm ci` rejects and pushes the fix back to the PR
+  branch (see `.github/workflows/ci.yml`). If CI has committed to your branch,
+  pull before committing again.
+- Never run `eas build`, `eas submit`, or `eas update` unless explicitly asked.
+- If a task is ambiguous, list your assumptions at the top of your response
+  before writing code — do not silently pick an interpretation.
+
+## Definition of done (checklist for every feature)
+
+1. Typecheck, lint, unit tests pass; `npx expo-doctor` still 20/20
+2. Loading / error / empty states implemented
+3. Works in dark mode and at 360px width, with the keyboard open if there are inputs
+4. RLS policies cover any new tables/columns
+5. Maestro flow added or updated for the happy path
+6. No new hardcoded colors, spacing, strings-with-secrets, or product IDs

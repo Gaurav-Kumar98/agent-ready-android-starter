@@ -8,9 +8,16 @@ Ships with a working auth flow (sign up → profile row via trigger → home),
 a paywall backed by RevenueCat, and a `subscriptions` table that is synced
 server-side by webhook so the client is never trusted for premium status.
 
-Built to be driven with Claude Code: [CLAUDE.md](CLAUDE.md) is the contract,
+Built to be driven by coding agents: [AGENTS.md](AGENTS.md) is the contract
+(`CLAUDE.md` just points at it), and
 `.claude/settings.json` enforces the non-negotiables (auto-format on write,
-`.env` protection, destructive-command guard, TypeScript gate on stop).
+`.env` protection, destructive-command guard, TypeScript gate on stop). The
+guards are Node scripts in `.claude/hooks/` — no `jq` or other tooling to
+install, and they fail closed rather than silently allowing what they exist to
+block.
+
+If `.env` is missing, the app boots to a setup screen explaining what to fill
+in rather than crashing on launch.
 
 ## Stack
 
@@ -19,6 +26,10 @@ Built to be driven with Claude Code: [CLAUDE.md](CLAUDE.md) is the contract,
 | Framework | Expo SDK 57 (managed workflow, dev client — not Expo Go) |
 | Routing | Expo Router (file-based, typed routes) |
 | Styling | NativeWind — semantic tokens only, dark mode from day one |
+| Primitives | gluestack UI v5 (headless) wrapped in the local design system |
+| Animation | Reanimated 4 + react-native-worklets |
+| Server state | TanStack React Query (caching, retry, dedup, refetch) |
+| OTA updates | `expo-updates` with a fingerprint runtime version |
 | Backend | Supabase: Postgres + Auth + Storage + Edge Functions |
 | Payments | RevenueCat (wraps Google Play Billing) |
 | Monitoring | Sentry |
@@ -74,18 +85,23 @@ Built to be driven with Claude Code: [CLAUDE.md](CLAUDE.md) is the contract,
 app/                  # Expo Router routes ONLY — thin screens, no business logic
 src/components/ui/    # Design-system primitives (Button, Card, Text, Input, ...)
 src/features/<name>/  # Feature logic: hooks, services, types per feature
-src/lib/              # Clients: supabase.ts, revenuecat.ts, sentry.ts
+src/lib/              # Clients: supabase.ts, revenuecat.ts, sentry.ts, query.ts
 src/types/database.ts # Generated from the Supabase schema — never hand-edit
 supabase/migrations/  # SQL migrations (source of truth for schema)
 supabase/functions/   # Edge Functions (RevenueCat webhook)
 .maestro/             # E2E flows
 ```
 
-See [CLAUDE.md](CLAUDE.md) for the full set of rules and
+See [AGENTS.md](AGENTS.md) for the full set of rules and
 [TEMPLATE_STRUCTURE.md](TEMPLATE_STRUCTURE.md) for the design rationale.
 
 ## One-time template setup (already done here)
 
 Maestro CLI for E2E runs: `curl -Ls https://get.maestro.mobile.dev | bash`
 (on Windows, install via WSL or see maestro.dev). After pushing to GitHub,
-mark the repo as a **Template repository** in Settings and enable CodeRabbit.
+mark the repo as a **Template repository** in Settings.
+
+Code review is human-triggered, not a bot on the PR: open the PR, then run
+`/review <PR number>` from Claude Code, or `/code-review ultra <PR number>` for
+the deeper multi-agent pass. CI never reviews the diff — it only proves the app
+still compiles and passes tests.
