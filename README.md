@@ -1,4 +1,31 @@
-# Expo Android Template
+# Agent-ready Android starter
+
+**An Expo Android template built to be developed with AI coding agents (Claude
+Code, Codex) without the codebase turning into spaghetti.**
+
+Most starters give an agent a blank canvas. This one gives it rules: a written
+contract it reads before every task, hooks it cannot argue with, and a
+definition of done. Auth, payments, a locked-down backend and tests are already
+wired, so the first prompt can be about your product, not your plumbing.
+
+**Use it:** click **Use this template** at the top of this page, then follow
+[New app from this template](#new-app-from-this-template).
+
+## What the agent gets
+
+| Guardrail | Where | What it does |
+|---|---|---|
+| The contract | [AGENTS.md](AGENTS.md) | Stack, architecture, design system, Supabase and payment rules, definition of done |
+| Format on write | `.claude/hooks/format.mjs` | Every file the agent writes is Prettier-formatted |
+| `.env` protection | `.claude/hooks/guard-env.mjs` | The agent cannot edit `.env` files; it tells you which variable to add |
+| Destructive-command guard | `.claude/hooks/guard-bash.mjs` | Blocks deleting `/` or `~`, `git push --force`, SQL `DROP`, a remote `supabase db reset`, and `eas build` / `submit` / `update` |
+| TypeScript gate | `.claude/hooks/typecheck.mjs` | The agent cannot finish while `tsc` fails |
+
+The hooks are plain Node scripts, with nothing extra to install, and they fail
+closed. Claude Code runs them automatically. Other agents that read
+`AGENTS.md`, such as Codex, get the same contract but not the hooks.
+
+## What you get
 
 Production-ready starting point for Android apps: Expo (managed, dev client) +
 TypeScript strict + Expo Router + NativeWind + Supabase (Auth, Postgres with
@@ -105,3 +132,9 @@ Code review is human-triggered, not a bot on the PR: open the PR, then run
 `/review <PR number>` from Claude Code, or `/code-review ultra <PR number>` for
 the deeper multi-agent pass. CI never reviews the diff — it only proves the app
 still compiles and passes tests.
+
+## About
+
+Built by [Gaurav Kumar](https://www.linkedin.com/in/gauravkumar98/). I build AI
+MVPs for founders, using this same agent-driven setup. If you're building
+something with AI, message me on LinkedIn with "BUILD".
